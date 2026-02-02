@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sam3_server"
+version = "0.1.0"
+authors = [
+    { name="Alexander Kern", email="laxnpander@gmail.com" },
+]
+description = "Sam3 example server."
+requires-python = ">=3.8"
+dependencies = [
+    "fastapi[standard]",
+    "python-multipart"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
