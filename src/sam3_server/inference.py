@@ -1,8 +1,8 @@
 import torch
 from sam3.model_builder import build_sam3_image_model
 from sam3.model.sam3_image_processor import Sam3Processor
+#from sam3.visualization_utils import plot_results
 import numpy as np
-import cv2
 
 class SAM3Inference:
     def __init__(self, checkpoint_path: str, device: str = "cpu"):
@@ -14,22 +14,37 @@ class SAM3Inference:
         self.model.to(device=self.device)
         self.processor = processor = Sam3Processor(self.model)
 
-    def run_inference(self, image_bytes, prompt: str):
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    def run_inference(self, image, prompt: str):
 
         inference_state = self.processor.set_image(image)
-
         output = self.processor.set_text_prompt(state=inference_state, prompt=prompt)
+
+        #plot_results(image, inference_state)
+
         masks, boxes, scores = output["masks"], output["boxes"], output["scores"]
 
-        mask_np = masks.squeeze().cpu().numpy().astype(np.uint8) * 255
+        masks_np = self.tensor_to_numpy(masks)
         boxes_np = boxes.cpu().numpy().tolist()
         scores_np = scores.cpu().numpy().tolist()
 
         return {
-            "mask": [],
+            "masks": masks_np,
             "boxes": boxes_np,
             "scores": scores_np
         }
+
+    def tensor_to_numpy(self, masks_tensor):
+        if masks_tensor is None or masks_tensor.numel() == 0:
+            return []
+
+        masks_np = masks_tensor.cpu().numpy()
+
+        b, n, h, w = masks_np.shape
+        flattened_masks = masks_np.reshape(-1, h, w)
+
+        np_mats = []
+        for i in range(flattened_masks.shape[0]):
+            mask = (flattened_masks[i] > 0).astype(np.uint8) * 255
+            np_mats.append(mask)
+
+        return np_mats

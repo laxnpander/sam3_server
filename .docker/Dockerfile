@@ -57,6 +57,8 @@ RUN curl -L "https://cloud.tu-braunschweig.de/s/b7STzAn7roz3fS7/download" -o /op
 WORKDIR /workspace
 COPY . .
 
+#RUN pip3 install matplotlib pandas scikit-image scikit-learn
+
 RUN pip3 install -e .
 
 WORKDIR /workspace/src

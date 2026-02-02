@@ -3,6 +3,8 @@ import shutil
 import uvicorn
 import argparse
 import torch
+import cv2
+from PIL import Image
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse
 from sam3_server.inference import SAM3Inference
@@ -13,6 +15,7 @@ class Sam3Server:
         self.app = FastAPI(title="Sam3 Server")
         self.upload_dir = upload_dir
         self.cache_dir = cache_dir
+        self.counter = 0
         self.sam = SAM3Inference(
             checkpoint_path=checkpoint_path,
             device="cuda" if torch.cuda.is_available() else "cpu"
@@ -71,16 +74,49 @@ class Sam3Server:
 
             try:
                 with open(filepath, "rb") as f:
-                    img_bytes = f.read()
+                    image = Image.open(filepath).convert("RGB")
 
-                inference_result = self.sam.run_inference(img_bytes, request.prompt)
-                results.append({"path": path, "result": inference_result})
-                print(inference_result)
+                inference_result = self.sam.run_inference(image, request.prompt)
+
+                filelist_masks = self.save_masks(inference_result["masks"])
+
+                results.append({
+                    "path": path,
+                    "masks": filelist_masks,
+                    "boxes": inference_result["boxes"],
+                    "scores": inference_result["scores"]
+                })
+
+                self.counter = self.counter+1
 
             except Exception as e:
                 results.append({"path": path, "error": str(e)})
 
-        return {"batch_results": results}
+        return {"results": results}
+
+    def save_masks(self, mask_list):
+
+        output_dir = os.path.join(self.cache_dir, str(self.counter))
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            print(f"Created directory: {output_dir}")
+
+        saved_paths = []
+
+        # 2. Iterate and save
+        for i, mask in enumerate(mask_list):
+            filename = f"mask_{i}.png"
+            filepath = os.path.join(output_dir, filename)
+
+            success = cv2.imwrite(filepath, mask)
+
+            if success:
+                saved_paths.append(filepath)
+            else:
+                print(f"Failed to save: {filepath}")
+
+        return saved_paths
 
 def main():
     parser = argparse.ArgumentParser(description="FastAPI Image Server with custom paths.")
